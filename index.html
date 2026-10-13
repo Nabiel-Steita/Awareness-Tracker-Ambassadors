@@ -61,7 +61,7 @@ input:focus{outline:none;border-color:var(--blue)}
 <div class="bar hide" id="bar"><div><div class="err" id="err" style="text-align:center"></div><button class="btn" id="submit"></button></div></div>
 <script>
 // ===== SUPABASE SETTINGS: paste your own values (Project Settings > API) =====
-const SUPABASE_URL='PASTE_PROJECT_URL_HERE',SUPABASE_KEY='PASTE_ANON_PUBLIC_KEY_HERE',BUCKET='screenshots';
+const SUPABASE_URL='https://vjnorpchbhnqdiatcixc.supabase.co',SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZqbm9ycGNoYmhucWRpYXRjaXhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MDg4NzYsImV4cCI6MjEwNzQ4NDg3Nn0.wHASd_36M7WB5_-YLf9gjOFsS11tKHCpo3J3ojwdGZ0',BUCKET='screenshots';
 const sb=SUPABASE_URL.startsWith('http')?supabase.createClient(SUPABASE_URL,SUPABASE_KEY):null;
 // storage file names must be plain ASCII, so Arabic etc. is stripped here (the readable name is kept in the database)
 const slug=s=>(String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9]+/g,'_').replace(/^_|_$/g,''))||'x';
