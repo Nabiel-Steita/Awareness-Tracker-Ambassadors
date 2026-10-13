@@ -130,6 +130,7 @@ function form(){
 
 function addGroup(){
   const g={el:document.createElement('div'),files:[]};g.el.className='card';groups.push(g);
+  NAT.sort((a,b)=>a[li[L]].localeCompare(b[li[L]],L));
   const natLabels=NAT.map(n=>n[li[L]]).concat([t('other')]);
   g.el.innerHTML=`<h2><span class="gt"></span><button class="del">${t('remove')}</button></h2>
   <label class="l">${t('ch')}</label>${chipSet('ch',t('chs'))}
