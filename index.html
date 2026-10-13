@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sharing Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--blue:#0B4DA2;--blue-d:#08357a;--tint:#E8F0FB;--bg:#F3F6FA;--card:#fff;--ink:#14213a;--mute:#5d6b84;--line:#d5deec;--err:#c0262d;color-scheme:light}
+*,*:before,*:after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Tahoma,Arial,sans-serif}
+.wrap{max-width:560px;margin:0 auto;padding:16px 16px 120px}
+header{background:var(--blue);color:#fff;padding:18px 16px;border-radius:0 0 20px 20px;margin:0 -16px 16px}
+header h1{margin:0;font-size:20px}header p{margin:4px 0 0;opacity:.85;font-size:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
+.card h2{font-size:16px;margin:0 0 12px;color:var(--blue-d);display:flex;justify-content:space-between;align-items:center}
+label.l{display:block;font-weight:600;font-size:14px;margin:14px 0 6px}
+label.l:first-of-type{margin-top:0}
+input[type=text],input[type=number]{width:100%;padding:13px;font-size:16px;border:1.5px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink)}
+input:focus{outline:none;border-color:var(--blue)}
+.list{border:1.5px solid var(--line);border-radius:12px;overflow:hidden;background:var(--bg)}
+.list.scroll{max-height:320px;overflow-y:auto}
+.chip{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-bottom:1px solid var(--line);cursor:pointer;user-select:none}
+.chip:last-child{border-bottom:0}
+.chip b{font-weight:500}
+.chip small{display:block;color:var(--mute);font-size:13px;margin-top:1px}
+.ind{flex:none;width:22px;height:22px;border:2px solid var(--mute);margin-top:1px;background:var(--card);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;line-height:1}
+.list[data-multi="0"] .ind{border-radius:50%}
+.list[data-multi="1"] .ind{border-radius:6px}
+.chip.on{background:var(--tint)}
+.chip.on .ind{background:var(--blue);border-color:var(--blue)}
+.chip.on .ind:after{content:"✓"}
+.back{background:rgba(255,255,255,.18);border:0;color:#fff;border-radius:10px;padding:7px 14px;font-size:14px;margin-bottom:10px;cursor:pointer}
+.langs{display:grid;gap:10px}
+.lang{padding:18px;font-size:20px;font-weight:600;border:2px solid var(--line);background:var(--card);color:var(--ink);border-radius:14px;cursor:pointer}
+.lang.on{border-color:var(--blue);background:var(--tint);color:var(--blue-d)}
+.btn{width:100%;padding:15px;font-size:17px;font-weight:600;border:0;border-radius:14px;background:var(--blue);color:#fff;cursor:pointer}
+.btn.sec{background:var(--tint);color:var(--blue-d);border:1.5px dashed var(--blue)}
+.btn:disabled{opacity:.5}
+.del{background:none;border:0;color:var(--err);font-size:14px;cursor:pointer}
+.hide{display:none!important}
+.up{display:block;border:2px dashed var(--blue);border-radius:12px;padding:16px;text-align:center;color:var(--blue-d);background:var(--tint);cursor:pointer;font-weight:600}
+.thumbs{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.thumbs img{width:64px;height:64px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+.err{color:var(--err);font-size:14px;margin-top:8px;min-height:1em}
+.bad{border-color:var(--err)!important;box-shadow:0 0 0 3px rgba(192,38,45,.18)}
+.sum{padding:12px 0;border-bottom:1px solid var(--line)}.sum:last-child{border:0}
+.sum h3{margin:0 0 6px;font-size:15px;color:var(--blue-d)}
+.sum dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px}
+.sum dt{color:var(--mute)}.sum dd{margin:0}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px))}
+.bar>div{max-width:560px;margin:0 auto}
+.done{text-align:center;padding:30px 10px}.done .tick{font-size:56px;color:var(--blue)}
+[dir=rtl] .wrap{text-align:right}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<div class="bar hide" id="bar"><div><div class="err" id="err" style="text-align:center"></div><button class="btn" id="submit"></button></div></div>
+<script>
+// ===== SUPABASE SETTINGS: paste your own values (Project Settings > API) =====
+const SUPABASE_URL='PASTE_PROJECT_URL_HERE',SUPABASE_KEY='PASTE_ANON_PUBLIC_KEY_HERE',BUCKET='screenshots';
+const sb=SUPABASE_URL.startsWith('http')?supabase.createClient(SUPABASE_URL,SUPABASE_KEY):null;
+// storage file names must be plain ASCII, so Arabic etc. is stripped here (the readable name is kept in the database)
+const slug=s=>(String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9]+/g,'_').replace(/^_|_$/g,''))||'x';
+const T={
+en:{dir:'ltr',title:'Sharing Tracker',sub:'Campaign Ambassadors',back:'← Back',sending:'Sending…',fail:'Could not send. Please check your internet and try again.',lose:'Go back? Your entries on this page will be lost.',notes:'Anything else about this group? (optional)',lang:'Choose your language',name:'Your name',namePh:'Full name',start:'Continue',
+ch:'How did you share?',chs:['WhatsApp group',['WhatsApp story','Posted on my own status'],'Facebook group',['Facebook story','Posted on my own story'],'Messenger group',['Direct to contacts','Sent privately to people one by one'],'Telegram group',['Instagram story','Posted on my own story']],
+gname:'Group name',members:'Number of people in the group',views:'Number of views',contacts:'Number of contacts',
+nat:'Nationality of the people',other:'Other',otherNat:'Write the nationality',mix:'Tap all that apply',
+type:'Type of group',types:[['Youth','Young people, around 15–25'],['All male','Only men in the group'],['All female','Only women in the group'],['Mixed','Men and women together'],['Children / students','School, learning centre or children’s group'],['People with disability','Members with a disability or their caregivers'],['Community leaders','Leaders, CSOs or other ambassadors'],['Families','Households, parents, neighbourhood groups'],['Workers','Job seekers or workers'],'Other'],otherType:'Name the group type',
+what:'What did you share?',whats:['SAFE STEPS Campaign Booklet','Video','Text message','Image / poster','Voice message','Link','Other'],otherWhat:'Name what you shared',
+shot:'Screenshot',upl:'Tap to add screenshots',group:'Group',add:'+ Add another group',submit:'Submit',remove:'Remove',
+need:'Please complete all fields in',needName:'Please write your name',done:'Submitted!',doneT:'Your information has been submitted. Thank you for taking the time to fill it in.',again:'Add new entries',total:'groups reported'},
+ar:{dir:'rtl',title:'متتبع المشاركة',sub:'سفراء الحملة',back:'→ رجوع',sending:'جارٍ الإرسال…',fail:'تعذر الإرسال. تحقق من الإنترنت وحاول مرة أخرى.',lose:'هل تريد الرجوع؟ ستفقد ما أدخلته في هذه الصفحة.',notes:'هل هناك شيء آخر عن هذه المجموعة؟ (اختياري)',lang:'اختر لغتك',name:'اسمك',namePh:'الاسم الكامل',start:'متابعة',
+ch:'كيف قمت بالمشاركة؟',chs:['مجموعة واتساب',['حالة واتساب','نُشرت على حالتي'],'مجموعة فيسبوك',['قصة فيسبوك','نُشرت على قصتي'],'مجموعة ماسنجر',['مباشرة لجهات الاتصال','أُرسلت بشكل خاص لكل شخص'],'مجموعة تيليجرام',['قصة إنستغرام','نُشرت على قصتي']],
+gname:'اسم المجموعة',members:'عدد الأشخاص في المجموعة',views:'عدد المشاهدات',contacts:'عدد جهات الاتصال',
+nat:'جنسية الأشخاص',other:'أخرى',otherNat:'اكتب الجنسية',mix:'اختر كل ما ينطبق',
+type:'نوع المجموعة',types:[['شباب','شباب بين 15 و25 سنة تقريباً'],['رجال فقط','المجموعة كلها رجال'],['نساء فقط','المجموعة كلها نساء'],['مختلطة','رجال ونساء معاً'],['أطفال / طلاب','مدرسة أو مركز تعليمي أو مجموعة أطفال'],['أشخاص ذوو إعاقة','أعضاء ذوو إعاقة أو مقدمو الرعاية لهم'],['قادة المجتمع','قادة أو منظمات مجتمع مدني أو سفراء آخرون'],['عائلات','أسر وآباء ومجموعات الحي'],['عمال','باحثون عن عمل أو عمال'],'أخرى'],otherType:'اكتب نوع المجموعة',
+what:'ماذا شاركت؟',whats:['كتيب حملة SAFE STEPS','فيديو','رسالة نصية','صورة / ملصق','رسالة صوتية','رابط','أخرى'],otherWhat:'اكتب ما شاركته',
+shot:'لقطة الشاشة',upl:'اضغط لإضافة لقطات الشاشة',group:'مجموعة',add:'+ إضافة مجموعة أخرى',submit:'إرسال',remove:'حذف',
+need:'يرجى إكمال كل الحقول في',needName:'يرجى كتابة اسمك',done:'تم الإرسال!',doneT:'تم إرسال معلوماتك. شكراً لك على تعبئتها.',again:'إضافة مدخلات جديدة',total:'مجموعات تم الإبلاغ عنها'},
+fr:{dir:'ltr',title:'Suivi des partages',sub:'Ambassadeurs de la campagne',back:'← Retour',sending:'Envoi…',fail:'Envoi impossible. Vérifiez votre connexion et réessayez.',lose:'Revenir en arrière ? Vos saisies sur cette page seront perdues.',notes:'Autre chose sur ce groupe ? (facultatif)',lang:'Choisissez votre langue',name:'Votre nom',namePh:'Nom complet',start:'Continuer',
+ch:'Comment avez-vous partagé ?',chs:['Groupe WhatsApp',['Statut WhatsApp','Publié sur mon statut'],'Groupe Facebook',['Story Facebook','Publiée sur ma story'],'Groupe Messenger',['Directement à des contacts','Envoyé en privé, un par un'],'Groupe Telegram',['Story Instagram','Publiée sur ma story']],
+gname:'Nom du groupe',members:'Nombre de personnes dans le groupe',views:'Nombre de vues',contacts:'Nombre de contacts',
+nat:'Nationalité des personnes',other:'Autre',otherNat:'Écrivez la nationalité',mix:'Touchez tout ce qui s’applique',
+type:'Type de groupe',types:[['Jeunes','Jeunes d’environ 15 à 25 ans'],['Hommes uniquement','Uniquement des hommes'],['Femmes uniquement','Uniquement des femmes'],['Mixte','Hommes et femmes ensemble'],['Enfants / élèves','École, centre d’apprentissage ou groupe d’enfants'],['Personnes handicapées','Membres en situation de handicap ou leurs aidants'],['Leaders communautaires','Leaders, OSC ou autres ambassadeurs'],['Familles','Ménages, parents, groupes de quartier'],['Travailleurs','Demandeurs d’emploi ou travailleurs'],'Autre'],otherType:'Nommez le type de groupe',
+what:'Qu’avez-vous partagé ?',whats:['Livret de la campagne SAFE STEPS','Vidéo','Message texte','Image / affiche','Message vocal','Lien','Autre'],otherWhat:'Nommez ce que vous avez partagé',
+shot:'Capture d’écran',upl:'Touchez pour ajouter des captures',group:'Groupe',add:'+ Ajouter un autre groupe',submit:'Envoyer',remove:'Supprimer',
+need:'Veuillez remplir tous les champs de',needName:'Veuillez écrire votre nom',done:'Envoyé !',doneT:'Vos informations ont bien été envoyées. Merci de les avoir remplies.',again:'Ajouter de nouvelles entrées',total:'groupes déclarés'}};
+// [en, ar, fr]
+const NAT=[['Sudan','السودان','Soudan'],['Nigeria','نيجيريا','Nigéria'],['Benin','بنين','Bénin'],['Togo','توغو','Togo'],['Sierra Leone','سيراليون','Sierra Leone'],['Chad','تشاد','Tchad'],['Mali','مالي','Mali'],['Senegal','السنغال','Sénégal'],['Cameroon','الكاميرون','Cameroun'],['Burkina Faso','بوركينا فاسو','Burkina Faso'],["Côte d'Ivoire",'ساحل العاج',"Côte d'Ivoire"],['DR Congo','الكونغو الديمقراطية','RD Congo'],['Guinea Conakry','غينيا كوناكري','Guinée Conakry'],['Gambia','غامبيا','Gambie'],['Ghana','غانا','Ghana'],['Guinea','غينيا','Guinée'],['Iraq','العراق','Irak'],['South Sudan','جنوب السودان','Soudan du Sud'],['Liberia','ليبيريا','Libéria'],['Syria','سوريا','Syrie'],['Niger','النيجر','Niger'],['Guinea-Bissau','غينيا بيساو','Guinée-Bissau'],['Libya','ليبيا','Libye'],['Ethiopia','إثيوبيا','Éthiopie'],['Eritrea','إريتريا','Érythrée']];
+const CH_EN=['WhatsApp group','WhatsApp story','Facebook group','Facebook story','Messenger group','Direct to contacts','Telegram group','Instagram story'];
+const TY_EN=['Youth','All male','All female','Mixed','Children / students','People with disability','Community leaders','Families','Workers','Other'];
+const WH_EN=['SAFE STEPS Campaign Booklet','Video','Text message','Image / poster','Voice message','Link','Other'];
+const NEEDS_NAME=[0,2,4,6]; // channels that have a group name
+let L='en',who='',groups=[];
+const $=s=>document.querySelector(s),t=k=>T[L][k];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const li=NAT.length&&{en:0,ar:1,fr:2};
+
+function home(){
+  $('#bar').classList.add('hide');
+  document.documentElement.lang=L;document.documentElement.dir=t('dir');
+  $('#app').innerHTML=`<header><h1>${t('title')}</h1><p>${t('sub')}</p></header>
+  <div class="card"><label class="l">${t('lang')}</label><div class="langs">
+  <button class="lang ${L=='ar'?'on':''}" data-l="ar">العربية</button>
+  <button class="lang ${L=='en'?'on':''}" data-l="en">English</button>
+  <button class="lang ${L=='fr'?'on':''}" data-l="fr">Français</button></div>
+  <label class="l" style="margin-top:18px">${t('name')}</label><input type="text" id="who" placeholder="${t('namePh')}" value="${esc(who)}" autocomplete="name">
+  <div class="err" id="herr"></div><button class="btn" id="go" style="margin-top:8px">${t('start')}</button></div>`;
+  document.querySelectorAll('.lang').forEach(b=>b.onclick=()=>{who=$('#who').value;L=b.dataset.l;home()});
+  $('#go').onclick=()=>{who=$('#who').value.trim();if(!who){$('#herr').textContent=t('needName');return}form()};
+}
+
+function chipSet(name,labels,multi,scroll){return `<div class="list${scroll?' scroll':''}" data-set="${name}" data-multi="${multi?1:0}">`+labels.map((x,i)=>{const [a,b]=[].concat(x);return `<div class="chip" data-i="${i}"><span class="ind"></span><span><b>${esc(a)}</b>${b?`<small>${esc(b)}</small>`:''}</span></div>`}).join('')+'</div>'}
+
+function form(){
+  document.documentElement.lang=L;document.documentElement.dir=t('dir');
+  $('#app').innerHTML=`<header><button class="back" id="back">${t('back')}</button><h1>${t('title')}</h1><p>${esc(who)}</p></header><div id="list"></div>
+  <button class="btn sec" id="add">${t('add')}</button>`;
+  $('#bar').classList.remove('hide');$('#submit').textContent=t('submit');$('#err').textContent='';
+  groups=[];addGroup();
+  $('#add').onclick=()=>{addGroup();window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'})};
+  $('#submit').onclick=submit;
+  $('#back').onclick=()=>{if(groups.some(g=>g.files.length||g.el.querySelector('.chip.on'))&&!confirm(t('lose')))return;home()};
+}
+
+function addGroup(){
+  const g={el:document.createElement('div'),files:[]};g.el.className='card';groups.push(g);
+  const natLabels=NAT.map(n=>n[li[L]]).concat([t('other')]);
+  g.el.innerHTML=`<h2><span class="gt"></span><button class="del">${t('remove')}</button></h2>
+  <label class="l">${t('ch')}</label>${chipSet('ch',t('chs'))}
+  <div class="nm hide"><label class="l">${t('gname')}</label><input type="text" class="gname"></div>
+  <label class="l cl">${t('members')}</label><input type="number" inputmode="numeric" min="0" class="count">
+  <label class="l">${t('nat')} <span style="font-weight:400;color:var(--mute)">(${t('mix')})</span></label>${chipSet('nat',natLabels,1,1)}
+  <input type="text" class="onat hide" placeholder="${t('otherNat')}" style="margin-top:8px">
+  <label class="l">${t('type')}</label>${chipSet('type',t('types'))}
+  <input type="text" class="oty hide" placeholder="${t('otherType')}" style="margin-top:8px">
+  <label class="l">${t('what')}</label>${chipSet('what',t('whats'),1)}
+  <input type="text" class="owh hide" placeholder="${t('otherWhat')}" style="margin-top:8px">
+  <label class="l">${t('notes')}</label><input type="text" class="notes">
+  <label class="l">${t('shot')}</label>
+  <label class="up">📷 ${t('upl')}<input type="file" accept="image/*,.heic,.heif" multiple hidden class="file"></label><div class="thumbs"></div>`;
+  $('#list').appendChild(g.el);
+  g.el.addEventListener('input',e=>e.target.classList.remove('bad'));
+  const q=s=>g.el.querySelector(s);
+  g.el.addEventListener('click',e=>{
+    const c=e.target.closest('.chip');if(!c)return;
+    const set=c.parentNode,multi=set.dataset.multi==='1',n=set.dataset.set,i=+c.dataset.i;set.classList.remove('bad');
+    if(multi)c.classList.toggle('on');else{set.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));c.classList.add('on')}
+    if(n==='ch'){q('.nm').classList.toggle('hide',!NEEDS_NAME.includes(i));
+      q('.cl').textContent=[1,3,7].includes(i)?t('views'):i===5?t('contacts'):t('members')}
+    if(n==='nat')q('.onat').classList.toggle('hide',!set.lastChild.classList.contains('on'));
+    if(n==='type')q('.oty').classList.toggle('hide',c!==set.lastChild);
+    if(n==='what')q('.owh').classList.toggle('hide',!set.lastChild.classList.contains('on'));
+  });
+  q('.file').onchange=e=>{q('.up').classList.remove('bad');g.files=g.files.concat([...e.target.files]);e.target.value='';
+    q('.thumbs').innerHTML='';g.files.forEach(f=>{const im=new Image();im.src=URL.createObjectURL(f);q('.thumbs').appendChild(im)})};
+  q('.del').onclick=()=>{if(groups.length<2)return;groups=groups.filter(x=>x!==g);g.el.remove();num()};
+  num();
+}
+function num(){groups.forEach((g,i)=>{g.el.querySelector('.gt').textContent=t('group')+' '+(i+1);g.el.querySelector('.del').style.display=groups.length>1?'':'none'})}
+
+function read(g){
+  const q=s=>g.el.querySelector(s),on=n=>[...g.el.querySelectorAll(`[data-set=${n}] .chip.on`)].map(c=>+c.dataset.i);
+  const ch=on('ch')[0],ty=on('type')[0],nats=on('nat'),wh=on('what');
+  const natList=nats.map(i=>i===NAT.length?(q('.onat').value.trim()):NAT[i][0]).filter(Boolean);
+  const whList=wh.map(i=>i===WH_EN.length-1?(q('.owh').value.trim()):WH_EN[i]).filter(Boolean);
+  const miss=[];const m=s=>miss.push(q(s));
+  if(ch==null)m('[data-set=ch]');if(NEEDS_NAME.includes(ch)&&!q('.gname').value.trim())m('.gname');if(q('.count').value==='')m('.count');
+  if(!nats.length)m('[data-set=nat]');else if(nats.includes(NAT.length)&&!q('.onat').value.trim())m('.onat');
+  if(ty==null)m('[data-set=type]');else if(ty===TY_EN.length-1&&!q('.oty').value.trim())m('.oty');
+  if(!wh.length)m('[data-set=what]');else if(wh.includes(WH_EN.length-1)&&!q('.owh').value.trim())m('.owh');
+  if(!g.files.length)m('.up');
+  return{ch,ty,miss,lbl:{ch:[].concat(t('chs')[ch])[0],ty:ty===TY_EN.length-1?q('.oty').value.trim():[].concat(t('types')[ty])[0],nat:nats.map(i=>i===NAT.length?q('.onat').value.trim():NAT[i][li[L]]).filter(Boolean),wh:wh.map(i=>i===WH_EN.length-1?q('.owh').value.trim():t('whats')[i]).filter(Boolean)},
+    channel:ch==null?'':CH_EN[ch],
+    groupName:NEEDS_NAME.includes(ch)?q('.gname').value.trim():'',
+    count:q('.count').value.trim(),
+    nationalities:natList,
+    groupType:ty==null?'':(ty===TY_EN.length-1?q('.oty').value.trim():TY_EN[ty]),
+    shared:whList,notes:q('.notes').value.trim(),files:g.files,
+    ok:!miss.length};
+}
+const clean=s=>String(s).replace(/[\\/:*?"<>|]+/g,'').trim().replace(/\s+/g,'_');
+const csvq=v=>'"'+String(v).replace(/"/g,'""')+'"';
+
+async function submit(){
+  const rows=groups.map(read);
+  document.querySelectorAll('.bad').forEach(x=>x.classList.remove('bad'));
+  rows.forEach(r=>r.miss.forEach(e=>e.classList.add('bad')));
+  const bad=rows.findIndex(r=>!r.ok);
+  if(bad>-1){$('#err').textContent=t('need')+' '+t('group')+' '+(bad+1);rows[bad].miss[0].scrollIntoView({behavior:'smooth',block:'center'});return}
+  $('#err').textContent='';
+  if(!sb){$('#err').textContent='Supabase is not configured yet (see README).';return}
+  $('#submit').disabled=true;$('#submit').textContent=t('sending');
+  const day=new Date().toISOString().slice(0,10),sid=crypto.randomUUID(),folder=slug(who);
+  try{
+    const out=[];
+    for(const [i,r] of rows.entries()){
+      const base=[slug(who),slug(r.groupName||r.channel),slug(r.count)].join('_'),paths=[],names=[];
+      for(const [k,f] of r.files.entries()){
+        const ext=((f.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,''))||'jpg',n=r.files.length>1?'_'+(k+1):'';
+        const key=`${folder}/${base}_${day}_g${i+1}${n}_${Math.random().toString(36).slice(2,6)}.${ext}`;
+        const {error}=await sb.storage.from(BUCKET).upload(key,f,{contentType:f.type||'image/jpeg'});
+        if(error)throw error;
+        paths.push(key);names.push([clean(who),clean(r.groupName||r.channel),r.count].join('_')+n+'.'+ext);
+      }
+      out.push({submission_id:sid,ambassador_name:who,language:L,channel:r.channel,group_name:r.groupName||null,people_count:+r.count,
+        count_type:[1,3,7].includes(r.ch)?'views':r.ch===5?'contacts':'members',nationalities:r.nationalities,group_type:r.groupType,
+        shared:r.shared,notes:r.notes||null,screenshot_paths:paths,screenshot_names:names});
+    }
+    const {error}=await sb.from('shares').insert(out);
+    if(error)throw error;
+  }catch(e){console.error(e);$('#err').textContent=t('fail');$('#submit').disabled=false;$('#submit').textContent=t('submit');return}
+  const cl=r=>[1,3,7].includes(r.ch)?t('views'):r.ch===5?t('contacts'):t('members');
+  const sum=rows.map((r,i)=>`<div class="sum"><h3>${t('group')} ${i+1} · ${esc(r.lbl.ch)}${r.groupName?' — '+esc(r.groupName):''}</h3><dl><dt>${cl(r)}</dt><dd>${esc(r.count)}</dd><dt>${t('nat')}</dt><dd>${esc(r.lbl.nat.join(', '))}</dd><dt>${t('type')}</dt><dd>${esc(r.lbl.ty)}</dd><dt>${t('what')}</dt><dd>${esc(r.lbl.wh.join(', '))}</dd><dt>${t('shot')}</dt><dd>${r.files.length}</dd></dl></div>`).join('');
+  $('#bar').classList.add('hide');$('#submit').disabled=false;
+  $('#app').innerHTML=`<header><h1>${t('title')}</h1><p>${esc(who)}</p></header><div class="card done"><div class="tick">✓</div><h2 style="justify-content:center;font-size:22px">${t('done')}</h2>
+  <p>${t('doneT')}</p><p style="color:var(--mute)">${rows.length} ${t('total')}</p></div><div class="card" style="padding:4px 16px">${sum}</div><button class="btn" id="again">${t('again')}</button>`;
+  $('#again').onclick=()=>form();
+}
+home();
+</script>
+</body>
+</html>
